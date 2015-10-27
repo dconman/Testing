@@ -17,6 +17,15 @@ data Dir = N | E | S | W
 type Enemy = (String, Int   , Int     , [Int])
 
 
+updateEnemy' :: Int -> Enemy -> Map
+updateEnemy' 0 en ((t,_,k,s,h,m):rs) = (t,en,k,s,h,m):rs
+updateEnemy' y en (r:rs)             = r:(updateEnemy' y-1 en rs)
+
+updateEnemy :: Int -> Int -> Enemy -> Map
+updateEnemy 0 y en (rs:rss) = (updateEnemy' y en rs):rss
+updateEnemy x y en (rs:rss) = sr:(updateEnemy x-1 y en rss)
+
+
 generateEnemyAttack :: IO [Command]
 generateEnemyAttack = let f 1 = Attack
                           f 2 = Block
@@ -45,7 +54,14 @@ fight (x,y,l,k,s,m) (n,h,str,coms) c1 = let d = if s then 15 else 5
        (Feint,Feint)   -> putStrLn ("You and the " ++ n ++ " both try to feint, but neither of you makes an actual attack.")
                          >> readCombat (x,y,l,k,s,m) (n,h,str,coms)
                         
-                        
+flee :: State -> Enemy -> IO ()
+flee (x,y,l,k,s,m) (n,_,str,_) = if 2*str > l
+                                   then putStrLn ("The " ++ n ++ " has defeated you!") >> return ()
+                                   else if x != 0
+                                           then putStrLn "You flee south!" >> mainEval (x,y,l-(2*str),k,s,m) (Go S)
+                                           else if y > startX 
+                                                  then putStrLn "You flee west!" >> mainEval (x,y,l-(2*str),k,s,m) (Go W)
+                                                  else putStrLn "You flee east!" >> mainEval (x,y,l-(2*str),k,s,m) (Go E)
 
 
 evalCombat :: State -> Enemy -> Command -> IO ()
@@ -55,7 +71,7 @@ evalCombat st en Fight = fight st en
 
 readCombat :: State -> Enemy -> IO ()
 readCombat (x,y,0,k,s,m) (n,_,_,_)  = putStrLn ("The " ++ n ++ " has defeated you!") >> return ()
-readCombat (x,y,l,k,s,m) (n,0,_,_)  = putStrLn ("You have defeated the " ++ n ++ "!") >> mainEval (x,y,l,k,s,m) Search
+readCombat (x,y,l,k,s,m) (n,0,_,_)  = putStrLn ("You have defeated the " ++ n ++ "!") >> mainEval (x,y,l,k,s,updateMap x y ("",0,0,[])) Search
 readCombat st            en         = putStrLn "What do you do?" >>
                                       getLine >>=
                                       evalCombat st en . parseCombat
@@ -67,6 +83,9 @@ parseCombat s = case toLower <$> s of
                   "block"  -> Block
                   "attack" -> Attack
                   _        -> Error
+
+
+mainEval = undefined
 
 
 {-
